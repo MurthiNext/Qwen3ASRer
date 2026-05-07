@@ -1,10 +1,12 @@
-import torch
+"""字幕/歌词生成模块 — SRT + LRC 格式。"""
+
 import re
 from typing import List, Tuple
-from qwen_asr import Qwen3ASRModel
+
 from qwen_asr.inference.qwen3_forced_aligner import ForcedAlignItem
 
 PUNCTUATION_PATTERN = re.compile(r"[、。！？，．,!\?\.\s]")
+
 
 def _build_position_map(text: str, items: List[ForcedAlignItem]) -> List[int]:
     """
@@ -33,11 +35,12 @@ def _build_position_map(text: str, items: List[ForcedAlignItem]) -> List[int]:
 
     return clean_to_orig
 
+
 def _segment_items_by_gap(
     items: List[ForcedAlignItem],
     gap_threshold: float = 0.4,
     max_duration: float = 10.0,
-    ) -> List[Tuple[int, int]]:
+) -> List[Tuple[int, int]]:
     """
     按时间间隔和最大时长将对齐项分割成段。
 
@@ -55,13 +58,11 @@ def _segment_items_by_gap(
     for i in range(len(items)):
         is_last = i == len(items) - 1
 
-        # 检查到下一项的时间间隔
         large_gap = False
         if not is_last:
             gap = items[i + 1].start_time - items[i].end_time
             large_gap = gap > gap_threshold
 
-        # 检查当前段是否超过最大时长
         cur_duration = items[i].end_time - items[seg_start].start_time
         too_long = cur_duration >= max_duration
 
@@ -71,20 +72,20 @@ def _segment_items_by_gap(
 
     return segments
 
+
 def _extract_original_text(
     text: str,
     seg_s: int,
     seg_e: int,
     items: List[ForcedAlignItem],
     clean_to_orig: List[int],
-    ) -> str:
+) -> str:
     """
     提取对齐项段落在原文中对应的文本（含标点）。
 
     逻辑：计算段落在 clean_text 中的字符范围 → 映射回原文位置 → 截取原文子串。
     若段尾后紧跟句末标点（。！？），一并纳入。
     """
-    # 计算每项在 clean_text 中的字符范围
     char_pos = 0
     item_starts: List[int] = []
     for item in items:
@@ -98,10 +99,8 @@ def _extract_original_text(
     orig_start = clean_to_orig[clean_start]
     orig_end = clean_to_orig[clean_end]
 
-    # 基础文本：从原文截取（含非句末标点，如顿号逗号）
-    display = text[orig_start : orig_end + 1]
+    display = text[orig_start: orig_end + 1]
 
-    # 若段尾后紧跟句末标点（。！？），一并纳入
     if orig_end + 1 < len(text):
         ch = text[orig_end + 1]
         if ch in "。！？":
@@ -109,7 +108,8 @@ def _extract_original_text(
 
     return display.strip()
 
-def _format_timestamp(seconds: float) -> str:
+
+def _format_timestamp_srt(seconds: float) -> str:
     """将秒数转换为 SRT 时间格式 HH:MM:SS,mmm。"""
     h = int(seconds // 3600)
     m = int((seconds % 3600) // 60)
@@ -120,12 +120,24 @@ def _format_timestamp(seconds: float) -> str:
         ms -= 1000
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
+
+def _format_timestamp_lrc(seconds: float) -> str:
+    """将秒数转换为 LRC 时间格式 [mm:ss.xx]。"""
+    m = int(seconds // 60)
+    s = int(seconds % 60)
+    cs = int(round((seconds - int(seconds)) * 100))
+    if cs >= 100:
+        s += 1
+        cs -= 100
+    return f"[{m:02d}:{s:02d}.{cs:02d}]"
+
+
 def generate_srt(
     text: str,
     items: List[ForcedAlignItem],
     gap_threshold: float = 0.4,
     max_duration: float = 10.0,
-    ) -> str:
+) -> str:
     """
     根据原文和对齐项生成 SRT 格式字幕。
 
@@ -146,8 +158,8 @@ def generate_srt(
 
     srt_lines: List[str] = []
     for seq, (s, e) in enumerate(segments, 1):
-        start_time = _format_timestamp(items[s].start_time)
-        end_time = _format_timestamp(items[e].end_time)
+        start_time = _format_timestamp_srt(items[s].start_time)
+        end_time = _format_timestamp_srt(items[e].end_time)
         display_text = _extract_original_text(text, s, e, items, clean_to_orig)
 
         srt_lines.append(str(seq))
@@ -157,43 +169,65 @@ def generate_srt(
 
     return "\n".join(srt_lines)
 
-def qwen_transcribe(
-        model_path: str = "./Qwen3-ASR-1.7B",
-        forced_aligner_path: str = "./Qwen3-ForcedAligner-0.6B",
-        audio_path: str = "audio.wav",
-        language: str = "Japanese",
-        return_time_stamps: bool = True,
-        dtype: torch.dtype = torch.bfloat16,
-        device: str = "cuda:0"
-    ) -> List[str]:
-    model = Qwen3ASRModel.from_pretrained(
-        model_path,
-        dtype=dtype,
-        device_map=device,
-        # attn_implementation="flash_attention_2",
-        max_inference_batch_size=24, # Batch size limit for inference. -1 means unlimited. Smaller values can help avoid OOM.
-        max_new_tokens=10240, # Maximum number of tokens to generate. Set a larger value for long audio input.
-        forced_aligner=forced_aligner_path,
-            dtype=dtype,
-            device_map=device,
-            # attn_implementation="flash_attention_2",
-        )
 
-    results = model.transcribe(
-        audio=audio_path,
-        language=language, # can also be set to None for automatic language detection
-        return_time_stamps=return_time_stamps,
-    )
+def generate_lrc(
+    items: List[ForcedAlignItem],
+    gap_threshold: float = 0.4,
+    max_duration: float = 10.0,
+) -> str:
+    """
+    根据对齐项生成 LRC 格式歌词。
 
-    return [generate_srt(r.text, r.time_stamps) for r in results]
+    使用 items 的文本和时间戳，每行格式为 [mm:ss.xx]文本。
 
-if __name__ == "__main__":
-    srt_list = qwen_transcribe(
-        model_path = "./Qwen3-ASR-1.7B",
-        forced_aligner_path = "./Qwen3-ForcedAligner-0.6B",
-        audio_path = "audio.wav",
-        language = "Japanese",
-        return_time_stamps = True,
-        dtype = torch.bfloat16,
-        device = "cuda:0"
-    )
+    Args:
+        items: 强制对齐结果列表
+        gap_threshold: 两项时间间隔超过此秒数则断句（默认 0.4s）
+        max_duration: 单条歌词最大时长，超时强制分割（默认 10s）
+
+    Returns:
+        LRC 格式字符串
+    """
+    if not items:
+        return ""
+
+    segments = _segment_items_by_gap(items, gap_threshold, max_duration)
+
+    lrc_lines: List[str] = []
+    for s, e in segments:
+        timestamp = _format_timestamp_lrc(items[s].start_time)
+        # 拼接段落文本
+        seg_text = "".join(it.text for it in items[s: e + 1])
+        lrc_lines.append(f"{timestamp}{seg_text}")
+
+    return "\n".join(lrc_lines)
+
+
+def export_subtitle(
+    text: str,
+    items: List[ForcedAlignItem],
+    fmt: str,
+    output_path: str,
+    gap_threshold: float = 0.4,
+    max_duration: float = 10.0,
+) -> None:
+    """
+    统一导出字幕/歌词文件。
+
+    Args:
+        text: ASR 识别的完整文本（含标点，LRC 格式不需要但 SRT 需要）
+        items: 强制对齐结果列表
+        fmt: 输出格式，"srt" 或 "lrc"
+        output_path: 输出文件路径
+        gap_threshold: 断句间隔阈值
+        max_duration: 单段最大时长
+    """
+    if fmt == "srt":
+        content = generate_srt(text, items, gap_threshold, max_duration)
+    elif fmt == "lrc":
+        content = generate_lrc(items, gap_threshold, max_duration)
+    else:
+        raise ValueError(f"不支持的格式: {fmt}，请使用 'srt' 或 'lrc'")
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)

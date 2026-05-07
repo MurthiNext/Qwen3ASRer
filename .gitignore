@@ -1,7 +1,15 @@
+# Python
 .venv
 __pycache__
+
+# Test Data
 *.txt
 *.srt
 *.wav
+
+# Models
 Qwen3-ASR-1.7B
 Qwen3-ForcedAligner-0.6B
+
+# Misc
+misc
