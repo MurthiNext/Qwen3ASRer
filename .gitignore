@@ -1,0 +1,7 @@
+.venv
+__pycache__
+*.txt
+*.srt
+*.wav
+Qwen3-ASR-1.7B
+Qwen3-ForcedAligner-0.6B
