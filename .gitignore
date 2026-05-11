@@ -1,9 +1,12 @@
 # Python
 .venv
 __pycache__
+*.spec
+build
+dist
 
 # Test Data
-*.txt
+script.txt
 *.srt
 *.wav
 
