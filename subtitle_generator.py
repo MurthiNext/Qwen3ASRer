@@ -1,5 +1,3 @@
-"""字幕/歌词生成模块 — SRT + LRC 格式。"""
-
 import re
 from typing import List, Tuple
 

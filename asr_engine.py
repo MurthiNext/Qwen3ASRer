@@ -1,5 +1,3 @@
-"""Qwen3-ASR 核心引擎模块 — 模型加载、语音转写。"""
-
 import threading
 from typing import List, Optional
 

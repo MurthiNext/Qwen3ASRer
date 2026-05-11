@@ -1,5 +1,3 @@
-"""主日志管理器，提供全局 logger 和 GUI 日志处理器。"""
-
 import logging
 import queue
 import threading

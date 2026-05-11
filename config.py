@@ -1,5 +1,3 @@
-"""Qwen3-ASR 桌面应用配置管理模块。"""
-
 import logging
 
 import torch

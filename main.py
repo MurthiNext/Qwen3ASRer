@@ -1,5 +1,3 @@
-"""Qwen3-ASR 桌面应用入口。"""
-
 from gui import AsrGui
 
 

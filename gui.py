@@ -1,8 +1,3 @@
-"""Qwen3-ASR GUI界面 — CustomTkinter + tkinter。
-
-代码结构: _define_components() 创建组件 → _layout_components() 布局 → 事件处理。
-"""
-
 import os
 import threading
 from tkinter import filedialog, messagebox
@@ -25,7 +20,7 @@ from config import (
 from main_logger import get_handler, get_logger
 from subtitle_generator import export_subtitle
 
-# ---- 布局常量 ----
+# 布局常量
 LABEL_WIDTH = 100
 ROW_PADY = 3
 SECTION_PADX = 12
@@ -55,9 +50,7 @@ class AsrGui:
         self._layout_components()
         self._start_log_polling()
 
-    # ============================================================
     # 组件定义 (只创建，不放置)
-    # ============================================================
 
     def _define_components(self) -> None:
         self._define_main_panels()
@@ -271,9 +264,7 @@ class AsrGui:
             text_color="gray70",
         )
 
-    # ============================================================
     # 布局 (只放置，不创建)
-    # ============================================================
 
     def _layout_components(self) -> None:
         self._layout_main_panels()
@@ -389,9 +380,7 @@ class AsrGui:
         self._log_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 4))
         self._log_clear_btn.pack(side="bottom", anchor="e", padx=10, pady=(0, 8))
 
-    # ============================================================
     # 日志轮询
-    # ============================================================
 
     def _start_log_polling(self) -> None:
         self._poll_log()
@@ -413,9 +402,7 @@ class AsrGui:
         self._log_textbox.delete("1.0", "end")
         self._log_textbox.configure(state="disabled")
 
-    # ============================================================
     # 事件处理
-    # ============================================================
 
     def _browse_model(self) -> None:
         path = filedialog.askdirectory(title="选择 ASR 模型目录")
@@ -566,7 +553,7 @@ class AsrGui:
         _logger.error("识别错误: %s", error_msg)
         messagebox.showerror("识别错误", error_msg)
 
-    # ---- UI 状态管理 ----
+    # UI 状态管理
 
     def _set_ui_state(self, running: bool) -> None:
         states = "disabled" if running else "normal"
@@ -583,7 +570,7 @@ class AsrGui:
     def _update_status(self, msg: str) -> None:
         self._status_var.set(msg)
 
-    # ---- 启动 ----
+    # 启动
 
     def run(self) -> None:
         """启动主循环。"""
